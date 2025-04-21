@@ -11,7 +11,7 @@ def get_similar_animes(anime_id, cosine_sim, anime_df, anime_indices, top_n=10):
     anime_indices_top = [i[0] for i in sim_scores]
     return anime_df.iloc[anime_indices_top][['anime_id', 'name', 'genres']]
 
-def recommend_for_user(user_id, ratings_df, anime_df, cosine_sim, anime_indices, top_n=10):
+def recommend_for_user(user_id, ratings_df, anime_df, cosine_sim, anime_indices, top_n=5):
     liked_animes = ratings_df[(ratings_df['user_id'] == user_id) & (ratings_df['rating'] >= 7)]
 
     if liked_animes.empty:

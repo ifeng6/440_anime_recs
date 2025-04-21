@@ -1,9 +1,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-import numpy as np
 
 def build_tfidf_matrix(anime_df):
     anime_df['content'] = anime_df['genres']
@@ -15,12 +13,9 @@ def build_feature_matrix(anime_df):
     # Select features
     num_features = ['average_rating', 'popularity']
 
-    # Fill missing values
     anime_df[num_features] = anime_df[num_features].fillna(0)
 
-    # Preprocess
     numeric = StandardScaler()
-
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', numeric, num_features),

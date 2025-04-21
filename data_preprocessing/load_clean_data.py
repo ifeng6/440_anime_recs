@@ -25,4 +25,7 @@ def load_anime_data():
     mean_rating = anime_df['average_rating'].mean()
     anime_df['average_rating'] = anime_df['average_rating'].fillna(mean_rating)
 
+    # Since we dropped entries, need to reset index for cosine similarity
+    anime_df = anime_df.reset_index(drop=True)
+
     return anime_df, ratings_df
