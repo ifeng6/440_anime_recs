@@ -5,6 +5,7 @@ from recommenders.content_recommender import create_anime_index_map
 from scipy.sparse import hstack
 from scipy import sparse
 from sklearn.model_selection import train_test_split
+from utils import handle, main
 import pandas as pd
 
 def train_test_split_per_user(df, test_size=0.2, min_ratings=5):
@@ -25,7 +26,8 @@ def train_test_split_per_user(df, test_size=0.2, min_ratings=5):
 
     return train_df, test_df
 
-def main():
+@handle("content_based")
+def content_based():
     anime_df, ratings_df = load_anime_data()
     print(f"anime_df size: {anime_df.shape[0]}, ratings_df size: {ratings_df.shape[0]}")
     train_ratings, test_ratings = train_test_split_per_user(ratings_df)
