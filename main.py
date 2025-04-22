@@ -1,5 +1,6 @@
 from data_preprocessing.load_clean_data import load_anime_data
 from evaluation.evaluate_model import evaluate_model
+from models.collaborative_filtering import CollaborativeFilteringRecommender
 from models.content_based import *
 from recommenders.content_recommender import create_anime_index_map
 from scipy.sparse import hstack
@@ -35,7 +36,7 @@ def content_based():
     # missing_anime = set(ratings_df['anime_id']) - (set(train_ratings['anime_id']).union(set(test_ratings['anime_id'])))
     # print(f"missing anime: {missing_anime}")
 
-    sample_users = test_ratings['user_id'].drop_duplicates().sample(100, random_state=42)
+    sample_users = test_ratings['user_id'].drop_duplicates().sample(10, random_state=42)
     test_subset = test_ratings[test_ratings['user_id'].isin(sample_users)]
     train_subset = train_ratings[train_ratings['user_id'].isin(sample_users)]
 
@@ -52,6 +53,17 @@ def content_based():
 
     results = evaluate_model(train_subset, test_subset, anime_df, cosine_sim, anime_indices, top_k=10)
     print(results)
+
+@handle("collaborative_filtering")
+def collaborative_filtering():
+    _, ratings_df = load_anime_data()
+    model = CollaborativeFilteringRecommender()
+
+    model.prepare_data(ratings_df)
+    model.train()
+
+    model.test()
+    model.evaluate_rmse()
 
 if __name__ == '__main__':
     main()
