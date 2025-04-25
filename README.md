@@ -1,6 +1,10 @@
 # Content-Based
-{'Precision@10': 0.242, 'Recall@10': 0.01668585402102821, 'NDCG@10': 0.24227442403065555, 'Total evaluated users': 100}
+Precision@25: 0.2
+Recall@25:    0.03929982632954391
+NDCG@25:      0.22218255264132386
 
 # Collaborative-Filtering
-RMSE: 0.9749
+Precision@25: 0.9489
+Recall@25:    0.1678
+NDCG@25:      0.9548
 

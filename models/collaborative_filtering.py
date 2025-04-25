@@ -27,3 +27,6 @@ class CollaborativeFilteringRecommender:
 
     def evaluate_rmse(self):
         return accuracy.rmse(self.predictions, verbose=True)
+    
+    def predict_rating(self, user_id, anime_id):
+        return self.model.predict(str(user_id), str(anime_id)).est
