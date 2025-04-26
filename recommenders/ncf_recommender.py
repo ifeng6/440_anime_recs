@@ -1,7 +1,7 @@
 import torch
 
-def recommend_ncf_for_user(model, user_id, train_user_items, all_anime_ids, item_genres_df,
-                           user2idx, item2idx, genre2idx, device, top_k=10):
+def recommend_ncf_for_user(model, user_id, train_user_items, all_anime_ids,
+                           user2idx, item2idx, device, top_k=10):
     model.eval()
 
     with torch.no_grad():
@@ -13,18 +13,8 @@ def recommend_ncf_for_user(model, user_id, train_user_items, all_anime_ids, item
 
         user_tensor = torch.tensor([user2idx[user_id]] * len(candidates), dtype=torch.long).to(device)
         item_tensor = torch.tensor([item2idx[aid] for aid in candidates], dtype=torch.long).to(device)
-
-        genre_lists = []
-        for aid in candidates:
-            genres = item_genres_df.get(aid, [])
-            genre_ids = [genre2idx.get(g, 0) for g in genres]
-            genre_lists.append(torch.tensor(genre_ids, dtype=torch.long))
         
-        # Pad genre lists
-        from torch.nn.utils.rnn import pad_sequence
-        genre_padded = pad_sequence(genre_lists, batch_first=True, padding_value=0).to(device)
-
-        preds = model(user_tensor, item_tensor, genre_padded)
+        preds = model(user_tensor, item_tensor)
         preds = preds.cpu().numpy()
 
         # Rank by predicted score

@@ -157,7 +157,6 @@ def ncf():
     # Extra preprocess for genre2idx
     anime_df['genres'] = anime_df['genres'].fillna('').apply(lambda x: x.strip().split())
     rating_df['genres'] = rating_df['genres'].fillna('').apply(lambda x: x.strip().split())
-    genre2idx = build_genre_vocab(anime_df)
 
     user_ids = rating_df['user_id'].unique()
     anime_ids = rating_df['anime_id'].unique()
@@ -167,21 +166,18 @@ def ncf():
 
     num_users = len(user2idx)
     num_items = len(item2idx)
-    num_genres = len(genre2idx)
 
-    print(f"Users: {num_users}, Items: {num_items}, Genres: {num_genres}")
+    print(f"Users: {num_users}, Items: {num_items}")
     train_df, test_df = train_test_split_per_user(rating_df, test_size=0.2)
 
-    train_dataset = NCFDataset(train_df, user2idx, item2idx, genre2idx)
+    train_dataset = NCFDataset(train_df, user2idx, item2idx)
     train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, collate_fn=ncf_collate_batch)
 
     model = NCF(
         num_users=num_users,
         num_items=num_items,
-        num_genres=num_genres,
         user_emb_dim=64,
         item_emb_dim=64,
-        genre_emb_dim=32,
         hidden_dims=[128, 64]
     ).to(device)
 
@@ -196,10 +192,9 @@ def ncf():
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
             user_ids = batch['user_id'].to(device)
             item_ids = batch['item_id'].to(device)
-            genres = batch['genres'].to(device)
             ratings = batch['rating'].to(device)
 
-            preds = model(user_ids, item_ids, genres)
+            preds = model(user_ids, item_ids)
             loss = loss_fn(preds, ratings)
 
             optimizer.zero_grad()
@@ -220,7 +215,6 @@ def ncf():
         anime_df,
         user2idx,
         item2idx,
-        genre2idx,
         device,
         top_k=25
     )

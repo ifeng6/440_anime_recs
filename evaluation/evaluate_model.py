@@ -127,11 +127,10 @@ def evaluate_multimodal_model(train_df, test_df, anime_embeddings_df, top_k=10, 
         'Total evaluated users': len(precision_scores)
     }
 
-def evaluate_ncf(model, train_df, test_df, anime_df, user2idx, item2idx, genre2idx, device, top_k=10):
+def evaluate_ncf(model, train_df, test_df, anime_df, user2idx, item2idx, device, top_k=10):
     model.eval()
 
     train_user_items = train_df.groupby('user_id')['anime_id'].apply(list).to_dict()
-    item_genres_df = anime_df.set_index('anime_id')['genres'].to_dict()
     all_anime_ids = anime_df['anime_id'].tolist()
     precisions, recalls, ndcgs = [], [], []
 
@@ -140,10 +139,8 @@ def evaluate_ncf(model, train_df, test_df, anime_df, user2idx, item2idx, genre2i
             model, user_id,
             train_user_items,
             all_anime_ids,
-            item_genres_df=item_genres_df,
             user2idx=user2idx,
             item2idx=item2idx,
-            genre2idx=genre2idx,
             device=device,
             top_k=top_k
         )
