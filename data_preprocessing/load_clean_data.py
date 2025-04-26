@@ -12,12 +12,8 @@ def load_anime_data():
 
     # Clean columns
     # - Remove anime with no genre info
-    # - Standardize genre format
     anime_df = anime_df.dropna(subset=['genres'])
-    anime_df['genres'] = anime_df['genres'].str.replace(',', ' ')
-
     ratings_df = ratings_df.dropna(subset=['genres'])
-    ratings_df['genres'] = ratings_df['genres'].str.replace(',', ' ')
 
     # Some ratings are "UNKNOWN" --> replace with mean
     anime_df['average_rating'] = anime_df['average_rating'].replace('UNKNOWN', np.nan)

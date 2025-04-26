@@ -168,3 +168,54 @@ def evaluate_ncf(model, train_df, test_df, anime_df, user2idx, item2idx, device,
         'Users evaluated': len(precisions)
     }
     return results
+
+def leave_one_out_evaluate(model, anime_df, test_df, top_k=10):
+    recalls = []
+    precisions = []
+    ndcgs = []
+
+    users_evaluated = 0
+
+    for idx, test_row in tqdm(test_df.iterrows(), total=len(test_df), desc="Evaluating"):
+        user_id = test_row['user_id']
+        true_anime_id = test_row['anime_id']
+
+        try:
+            test_anime = anime_df[anime_df['anime_id'] == true_anime_id].iloc[0]
+            pseudo_prompt = test_anime['overview']
+        except:
+            continue
+        
+        prompt_emb = model.encode_prompt(pseudo_prompt)
+
+        try:
+            recommendation_list = model.recommend_hybrid(user_id, prompt_emb, top_k=top_k)
+        except:
+            continue
+
+        if len(recommendation_list) == 0:
+            continue
+
+        if true_anime_id in recommendation_list:
+            recalls.append(1)
+            precisions.append(1/top_k)  # one hit out of top_k
+            rank = recommendation_list.index(true_anime_id) + 1  # rank starting from 1
+            ndcgs.append(1 / np.log2(rank + 1))
+        else:
+            recalls.append(0)
+            precisions.append(0)
+            ndcgs.append(0)
+
+        users_evaluated += 1
+
+    if users_evaluated == 0:
+        print("No users evaluated.")
+        return {}
+
+    results = {
+        f'Precision@{top_k}': np.mean(precisions),
+        f'Recall@{top_k}': np.mean(recalls),
+        f'NDCG@{top_k}': np.mean(ndcgs),
+        'Users evaluated': users_evaluated
+    }
+    return results

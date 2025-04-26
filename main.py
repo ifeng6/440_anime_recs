@@ -1,5 +1,5 @@
 from data_preprocessing.load_clean_data import load_anime_data
-from evaluation.evaluate_model import evaluate_cb_model, evaluate_cf_model, evaluate_multimodal_model, evaluate_ncf
+from evaluation.evaluate_model import evaluate_cb_model, evaluate_cf_model, evaluate_multimodal_model, evaluate_ncf, leave_one_out_evaluate
 from models.collaborative_filtering import CollaborativeFilteringRecommender
 from models.content_based import *
 from recommenders.content_recommender import create_anime_index_map
@@ -47,9 +47,32 @@ def custom_collate_fn(batch):
 
     return batch_dict
 
+def leave_one_out_split(rating_df, leave_out=1, threshold=7):
+    train_rows = []
+    test_rows = []
+
+    for user_id, user_data in rating_df.groupby('user_id'):
+        user_ratings = rating_df[rating_df['user_id'] == user_id]
+        high_rated = user_ratings[user_ratings['rating'] >= threshold]
+
+        if len(high_rated) < leave_out:
+            continue  # skip small profile users
+
+        # Randomly select one highly rated anime
+        test_interaction = high_rated.sample(leave_out)
+        train_interactions = user_data.drop(test_interaction.index)
+
+        train_rows.append(train_interactions)
+        test_rows.append(test_interaction)
+
+    train_df = pd.concat(train_rows)
+    test_df = pd.concat(test_rows)
+
+    return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
+
 # ------------------------------------------------------------------------------------------------------------------------- #
 
-@handle("content_based")
+@handle("cb")
 def content_based():
     anime_df, ratings_df = load_anime_data()
     print(f"anime_df size: {anime_df.shape[0]}, ratings_df size: {ratings_df.shape[0]}")
@@ -76,7 +99,7 @@ def content_based():
     results = evaluate_cb_model(train_subset, test_subset, anime_df, cosine_sim, anime_indices, top_k=25)
     print(results)
 
-@handle("collaborative_filtering")
+@handle("cf")
 def collaborative_filtering():
     _, ratings_df = load_anime_data()
     model = CollaborativeFilteringRecommender()
@@ -102,7 +125,7 @@ def multimodal():
     anime_df, _ = load_anime_data()
 
     # Extra preprocess for genre2idx
-    anime_df['genres'] = anime_df['genres'].fillna('').apply(lambda x: x.strip().split())
+    anime_df['genres'] = anime_df['genres'].fillna('').apply(lambda x: x.strip().split(","))
     genre2idx = build_genre_vocab(anime_df)
 
     dataset = AnimeDataset(anime_df, genre2idx)
@@ -155,8 +178,8 @@ def ncf():
     anime_df, rating_df = load_anime_data()
 
     # Extra preprocess for genre2idx
-    anime_df['genres'] = anime_df['genres'].fillna('').apply(lambda x: x.strip().split())
-    rating_df['genres'] = rating_df['genres'].fillna('').apply(lambda x: x.strip().split())
+    anime_df['genres'] = anime_df['genres'].fillna('').apply(lambda x: x.strip().split(","))
+    rating_df['genres'] = rating_df['genres'].fillna('').apply(lambda x: x.strip().split(","))
 
     user_ids = rating_df['user_id'].unique()
     anime_ids = rating_df['anime_id'].unique()
@@ -222,6 +245,25 @@ def ncf():
     print("Evaluation Results:")
     for metric, value in results.items():
         print(f"{metric}: {value:.4f}")
+
+@handle("prompt")
+def prompt():
+    from models.prompt import PromptModel
+    
+    anime_df, rating_df = load_anime_data()
+    leave_out = 10
+    print(rating_df.shape)
+    train_df, test_df = leave_one_out_split(rating_df, leave_out=leave_out)
+    print(train_df.shape, test_df.shape)
+    model = PromptModel(anime_df, train_df)
+    model.encode_anime()
+    model.train_cf_model()
+    results = leave_one_out_evaluate(model, anime_df, test_df, top_k=leave_out)
+
+    print("\nEvaluation Results:")
+    for metric, value in results.items():
+        print(f"{metric}: {value:.4f}")
+
 
 if __name__ == '__main__':
     main()
