@@ -2,6 +2,8 @@ from collections import defaultdict
 import numpy as np
 from tqdm import tqdm
 from recommenders.content_recommender import recommend_for_user
+from recommenders.multimodal_recommender import recommend_mm_for_user
+from recommenders.ncf_recommender import recommend_ncf_for_user
 
 def precision_at_k(recommended, relevant, k):
     recommended_k = recommended[:k]
@@ -94,3 +96,78 @@ def evaluate_cf_model(predictions, k=10, threshold=7):
         ndcgs[uid] = ndcg_at_k(top_k_items, relevant_items, k)
 
     return precisions, recalls, ndcgs
+
+def evaluate_multimodal_model(train_df, test_df, anime_embeddings_df, top_k=10, threshold=7):
+    users = test_df['user_id'].unique()
+    precision_scores = []
+    recall_scores = []
+    ndcg_scores = []
+
+    for uid in tqdm(users, desc="Evaluating users"):
+        recommended = recommend_mm_for_user(uid, train_df, anime_embeddings_df, top_k=top_k, threshold=threshold)
+        if not recommended:
+            continue
+
+        relevant = test_df[(test_df['user_id'] == uid) & (test_df['rating'] >= threshold)]['anime_id'].tolist()
+        if not relevant:
+            continue
+
+        prec = precision_at_k(recommended, relevant, top_k)
+        rec = recall_at_k(recommended, relevant, top_k)
+        ndcg = ndcg_at_k(recommended, relevant, top_k)
+
+        precision_scores.append(prec)
+        recall_scores.append(rec)
+        ndcg_scores.append(ndcg)
+
+    return {
+        f'Precision@{top_k}': np.mean(precision_scores),
+        f'Recall@{top_k}': np.mean(recall_scores),
+        f'NDCG@{top_k}': np.mean(ndcg_scores),
+        'Total evaluated users': len(precision_scores)
+    }
+
+def evaluate_ncf(model, train_df, test_df, anime_df, user2idx, item2idx, genre2idx, device, top_k=10):
+    model.eval()
+
+    train_user_items = train_df.groupby('user_id')['anime_id'].apply(list).to_dict()
+    item_genres_df = anime_df.set_index('anime_id')['genres'].to_dict()
+    all_anime_ids = anime_df['anime_id'].tolist()
+    precisions, recalls, ndcgs = [], [], []
+
+    for user_id in tqdm(test_df['user_id'].unique(), desc="Evaluating users"):
+        recommended_ids = recommend_ncf_for_user(
+            model, user_id,
+            train_user_items,
+            all_anime_ids,
+            item_genres_df=item_genres_df,
+            user2idx=user2idx,
+            item2idx=item2idx,
+            genre2idx=genre2idx,
+            device=device,
+            top_k=top_k
+        )
+
+        relevant_ids = test_df[
+            (test_df['user_id'] == user_id) &
+            (test_df['rating'] >= 7)
+        ]['anime_id'].tolist()
+
+        if not relevant_ids:
+            continue
+
+        prec = precision_at_k(recommended_ids, relevant_ids, top_k)
+        rec = recall_at_k(recommended_ids, relevant_ids, top_k)
+        ndcg = ndcg_at_k(recommended_ids, relevant_ids, top_k)
+
+        precisions.append(prec)
+        recalls.append(rec)
+        ndcgs.append(ndcg)
+
+    results = {
+        f'Precision@{top_k}': np.mean(precisions),
+        f'Recall@{top_k}': np.mean(recalls),
+        f'NDCG@{top_k}': np.mean(ndcgs),
+        'Users evaluated': len(precisions)
+    }
+    return results

@@ -1,5 +1,5 @@
 from data_preprocessing.load_clean_data import load_anime_data
-from evaluation.evaluate_model import evaluate_cb_model, evaluate_cf_model
+from evaluation.evaluate_model import evaluate_cb_model, evaluate_cf_model, evaluate_multimodal_model, evaluate_ncf
 from models.collaborative_filtering import CollaborativeFilteringRecommender
 from models.content_based import *
 from recommenders.content_recommender import create_anime_index_map
@@ -137,7 +137,97 @@ def multimodal():
 def eval_multimodal():
     _, rating_df = load_anime_data()
     anime_embeddings_df = pd.read_pickle("anime_multimodal_embeddings.pkl")
+    train_ratings, test_ratings = train_test_split_per_user(rating_df)
 
+    results = evaluate_multimodal_model(train_ratings, test_ratings, anime_embeddings_df, top_k=25)
+    for metric, value in results.items():
+        print(f"{metric}: {value:.4f}")
+
+
+@handle("ncf")
+def ncf():
+    import torch
+    from torch.utils.data import DataLoader
+    from torch import nn, optim
+    from tqdm import tqdm
+    from models.NCF import NCF, NCFDataset, ncf_collate_batch
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    anime_df, rating_df = load_anime_data()
+
+    # Extra preprocess for genre2idx
+    anime_df['genres'] = anime_df['genres'].fillna('').apply(lambda x: x.strip().split())
+    rating_df['genres'] = rating_df['genres'].fillna('').apply(lambda x: x.strip().split())
+    genre2idx = build_genre_vocab(anime_df)
+
+    user_ids = rating_df['user_id'].unique()
+    anime_ids = rating_df['anime_id'].unique()
+
+    user2idx = {u: idx for idx, u in enumerate(user_ids)}
+    item2idx = {i: idx for idx, i in enumerate(anime_ids)}
+
+    num_users = len(user2idx)
+    num_items = len(item2idx)
+    num_genres = len(genre2idx)
+
+    print(f"Users: {num_users}, Items: {num_items}, Genres: {num_genres}")
+    train_df, test_df = train_test_split_per_user(rating_df, test_size=0.2)
+
+    train_dataset = NCFDataset(train_df, user2idx, item2idx, genre2idx)
+    train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, collate_fn=ncf_collate_batch)
+
+    model = NCF(
+        num_users=num_users,
+        num_items=num_items,
+        num_genres=num_genres,
+        user_emb_dim=64,
+        item_emb_dim=64,
+        genre_emb_dim=32,
+        hidden_dims=[128, 64]
+    ).to(device)
+
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    loss_fn = nn.MSELoss()
+
+    num_epochs = 15
+
+    for epoch in range(num_epochs):
+        model.train()
+        total_loss = 0
+        for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+            user_ids = batch['user_id'].to(device)
+            item_ids = batch['item_id'].to(device)
+            genres = batch['genres'].to(device)
+            ratings = batch['rating'].to(device)
+
+            preds = model(user_ids, item_ids, genres)
+            loss = loss_fn(preds, ratings)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item() * len(user_ids)
+
+        avg_loss = total_loss / len(train_loader.dataset)
+        print(f"Epoch {epoch+1} - Avg MSE Loss: {avg_loss:.4f}")
+
+    torch.save(model.state_dict(), "ncf.pth")
+    print("Model saved!")
+    results = evaluate_ncf(
+        model,
+        train_df,
+        test_df,
+        anime_df,
+        user2idx,
+        item2idx,
+        genre2idx,
+        device,
+        top_k=25
+    )
+
+    print("Evaluation Results:")
+    for metric, value in results.items():
+        print(f"{metric}: {value:.4f}")
 
 if __name__ == '__main__':
     main()

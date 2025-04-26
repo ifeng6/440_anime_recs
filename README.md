@@ -8,3 +8,7 @@ Precision@25: 0.9489
 Recall@25:    0.1678
 NDCG@25:      0.9548
 
+# Multimodal
+Precision@25: 0.0568
+Recall@25: 0.0089
+NDCG@25: 0.0554

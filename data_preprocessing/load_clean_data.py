@@ -30,5 +30,6 @@ def load_anime_data():
 
     # Since we dropped entries, need to reset index for cosine similarity
     anime_df = anime_df.reset_index(drop=True)
+    ratings_df = ratings_df.reset_index(drop=True)
 
     return anime_df, ratings_df
