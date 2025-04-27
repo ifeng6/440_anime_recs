@@ -48,25 +48,30 @@ class PromptModel:
     def encode_prompt(self, prompt):
         return self.bert_model.encode(prompt)
 
-    def recommend_hybrid(self, user_id, prompt_embedding, top_k=10, alpha=0.5):
+    def recommend_hybrid(self, user_id, prompt_embedding, 
+                        top_k=10, alpha=0.5, unseen_anime_ids=None):
         from sklearn.metrics.pairwise import cosine_similarity
 
-        user_history = self.rating_df[self.rating_df['user_id'] == user_id]['anime_id'].tolist()
-        unseen_anime_df = self.anime_df[~self.anime_df['anime_id'].isin(user_history)]
+        # If unseen_anime_ids are provided manually (evaluation)
+        if unseen_anime_ids is None:
+            user_history = self.rating_df[self.rating_df['user_id'] == user_id]['anime_id'].tolist()
+            unseen_anime_df = self.anime_df[~self.anime_df['anime_id'].isin(user_history)]
+        else:
+            unseen_anime_df = self.anime_df[self.anime_df['anime_id'].isin(unseen_anime_ids)]
 
         cf_preds = []
         for _, row in unseen_anime_df.iterrows():
             anime_id = row['anime_id']
             est = self.svd_model.predict(user_id, anime_id).est
             cf_preds.append((anime_id, est))
-        
+
         cf_df = pd.DataFrame(cf_preds, columns=['anime_id', 'cf_score'])
 
-        anime_ids = list(self.synopsis_embeddings.keys())
-        synopsis_embeds = np.array(list(self.synopsis_embeddings.values()))
+        anime_ids = unseen_anime_df['anime_id'].tolist()
+        synopsis_embeds = np.array([self.synopsis_embeddings[aid] for aid in anime_ids])
+
         sim_scores = cosine_similarity([prompt_embedding], synopsis_embeds).flatten()
         sim_df = pd.DataFrame({'anime_id': anime_ids, 'prompt_similarity': sim_scores})
-
 
         merged = cf_df.merge(sim_df, on='anime_id', how='inner')
         merged['cf_score'] = (merged['cf_score'] - merged['cf_score'].min()) / (merged['cf_score'].max() - merged['cf_score'].min() + 1e-8)

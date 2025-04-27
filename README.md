@@ -23,3 +23,8 @@ No genres:
 Precision@25: 0.2031
 Recall@25: 0.0344
 NDCG@25: 0.2076
+
+# Prompt
+Precision@25: 0.0950
+Recall@25: 0.9496
+NDCG@25: 0.8686

@@ -169,11 +169,10 @@ def evaluate_ncf(model, train_df, test_df, anime_df, user2idx, item2idx, device,
     }
     return results
 
-def leave_one_out_evaluate(model, anime_df, test_df, top_k=10):
+def leave_one_out_evaluate(model, anime_df, train_df, test_df, top_k=10):
     recalls = []
     precisions = []
     ndcgs = []
-
     users_evaluated = 0
 
     for idx, test_row in tqdm(test_df.iterrows(), total=len(test_df), desc="Evaluating"):
@@ -185,11 +184,21 @@ def leave_one_out_evaluate(model, anime_df, test_df, top_k=10):
             pseudo_prompt = test_anime['overview']
         except:
             continue
-        
         prompt_emb = model.encode_prompt(pseudo_prompt)
 
+        user_seen_animes = train_df[train_df['user_id'] == user_id]['anime_id'].tolist()
+
+        candidate_anime_ids = anime_df[
+            ~anime_df['anime_id'].isin(user_seen_animes)
+        ]['anime_id'].tolist()
+
         try:
-            recommendation_list = model.recommend_hybrid(user_id, prompt_emb, top_k=top_k)
+            recommendation_list = model.recommend_hybrid(
+                user_id, 
+                prompt_emb, 
+                top_k=top_k,
+                unseen_anime_ids=candidate_anime_ids
+            )
         except:
             continue
 
@@ -199,7 +208,7 @@ def leave_one_out_evaluate(model, anime_df, test_df, top_k=10):
         if true_anime_id in recommendation_list:
             recalls.append(1)
             precisions.append(1/top_k)  # one hit out of top_k
-            rank = recommendation_list.index(true_anime_id) + 1  # rank starting from 1
+            rank = recommendation_list.index(true_anime_id) + 1
             ndcgs.append(1 / np.log2(rank + 1))
         else:
             recalls.append(0)

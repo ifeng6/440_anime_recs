@@ -251,14 +251,14 @@ def prompt():
     from models.prompt import PromptModel
     
     anime_df, rating_df = load_anime_data()
-    leave_out = 10
+    leave_out = 1
     print(rating_df.shape)
     train_df, test_df = leave_one_out_split(rating_df, leave_out=leave_out)
     print(train_df.shape, test_df.shape)
     model = PromptModel(anime_df, train_df)
     model.encode_anime()
     model.train_cf_model()
-    results = leave_one_out_evaluate(model, anime_df, test_df, top_k=leave_out)
+    results = leave_one_out_evaluate(model, anime_df, train_df, test_df, top_k=25)
 
     print("\nEvaluation Results:")
     for metric, value in results.items():
